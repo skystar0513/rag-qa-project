@@ -38,6 +38,7 @@ Query → Embedding → Similarity Search → Context 생성 → LLM → Answer
 - OpenAI API (gpt-4o-mini)  
 - FAISS (Vector Search)  
 - PyPDF (문서 로딩)  
+- Streamlit (UI)
 
 ---
 
@@ -55,6 +56,7 @@ rag_qa_project/
 │  └─ sample.pdf          # 테스트용 문서
 ├─ .env                   # OpenAI API Key
 ├─ requirements.txt
+├─ stream.py              # UI
 └─ README.md
 ```
 
@@ -88,7 +90,15 @@ python app.py
 
 ---
 
-### 4. 실행 예시
+### 4. Streamlit 실행
+
+```bash
+streamlit run stream.py
+```
+
+---
+
+### 5. 실행 예시
 
 ```
 PDF 로딩 중...
@@ -110,3 +120,7 @@ PDF 로딩 중...
 --- 문서 2 ---
 감전 위험을 방지하기 위해...
 ```
+---
+### 실행 화면
+![upload](assets/demo1.png)
+![upload](assets/demo2.png)
