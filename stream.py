@@ -7,6 +7,9 @@ from modules.loader import load_pdf
 from modules.splitter import split_documents
 from modules.vectorstore import build_vectorstore
 from modules.qa import ask_question
+from modules.logger import save_log
+from modules.log_reader import load_logs, get_recent_logs, get_question_counts, get_basic_stats
+
 
 
 load_dotenv()
@@ -96,16 +99,53 @@ if ask_btn:
     else:
         try:
             with st.spinner("답변을 생성하는 중입니다..."):
-                answer, relevant_docs = ask_question(query, st.session_state.retriever)
+                answer, relevant_docs, scores = ask_question(query, st.session_state.retriever)
+                save_log(query, answer, relevant_docs, scores)
 
             st.subheader("답변")
             st.write(answer)
 
+            st.success("질문/답변 로그가 저장되었습니다.")
+
             st.subheader("참고 문서")
-            for i, doc in enumerate(relevant_docs, start=1):
+            for i, (doc, score) in enumerate(zip(relevant_docs, scores), start=1):
                 with st.expander(f"문서 {i}"):
+                    st.write(f"**유사도 점수:** {score}")
                     st.write(doc.page_content)
                     if hasattr(doc, "metadata") and doc.metadata:
                         st.caption(f"metadata: {doc.metadata}")
         except Exception as e:
             st.error(f"답변 생성 중 오류가 발생했습니다: {e}")
+        
+        st.divider()
+        st.subheader("질문 로그 분석")
+
+        logs_df = load_logs()
+
+        if logs_df.empty:
+            st.info("아직 저장된 로그가 없습니다.")
+        else:
+            stats = get_basic_stats(logs_df)
+
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("총 질문 수", stats["total_questions"])
+            with col2:
+                st.metric("고유 질문 수", stats["unique_questions"])
+
+            st.markdown("### 최근 질문 로그")
+            recent_logs = get_recent_logs(logs_df, n=5)
+
+            for i, row in recent_logs.iterrows():
+                with st.expander(f"[{row['timestamp']}] {row['question']}"):
+                    st.write(f"**답변:** {row['answer']}")
+                    if "scores" in row:
+                        st.write(f"**scores:** {row['scores']}")
+                    if "contexts" in row:
+                        st.write(f"**contexts:** {row['contexts']}")
+
+            st.markdown("### 자주 나온 질문")
+            question_counts = get_question_counts(logs_df)
+
+            if not question_counts.empty:
+                st.dataframe(question_counts.head(10), use_container_width=True)

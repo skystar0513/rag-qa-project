@@ -2,6 +2,7 @@
 
 PDF 문서를 기반으로 사용자의 질문에 답변하는 **RAG(Retrieval-Augmented Generation)** 시스템을 구현한 프로젝트입니다.  
 문서를 단순히 요약하는 것이 아니라, **질문과 관련된 내용을 검색한 뒤 이를 기반으로 답변을 생성**하도록 설계했습니다.
+또한 질문 결과를 저장하고 분석하는 기능을 추가하여, 단순 질의응답을 넘어 **문서 활용 데이터를 축적하고 분석할 수 있는 구조로 확장**했습니다.
 
 ---
 
@@ -27,6 +28,10 @@ PDF 문서를 기반으로 사용자의 질문에 답변하는 **RAG(Retrieval-A
 PDF → Chunking → Embedding → Vector DB(FAISS)
                                ↓
 Query → Embedding → Similarity Search → Context 생성 → LLM → Answer
+↓
+Log 저장(CSV)
+↓
+로그 분석 및 시각화
 ```
 
 ---
@@ -39,7 +44,7 @@ Query → Embedding → Similarity Search → Context 생성 → LLM → Answer
 - FAISS (Vector Search)  
 - PyPDF (문서 로딩)  
 - Streamlit (UI)
-
+- pandas (log 분석)
 ---
 
 ## 프로젝트 구조
@@ -51,7 +56,11 @@ rag_qa_project/
 │  ├─ loader.py           # PDF 로딩
 │  ├─ splitter.py         # 문서 분할
 │  ├─ vectorstore.py      # 임베딩 및 벡터 DB 생성
-│  └─ qa.py               # 질문 → 답변 생성
+│  ├─ qa.py               # 질문 → 답변 생성
+│  ├─ logger.py # CSV 로그 저장
+│  └─ log_reader.py # 로그 분석
+├─ logs/
+│ └── qa_log.csv # 질문/답변 로그
 ├─ data/
 │  └─ sample.pdf          # 테스트용 문서
 ├─ .env                   # OpenAI API Key
@@ -82,15 +91,7 @@ OPENAI_API_KEY=your_api_key
 
 ---
 
-### 3. 실행
-
-```bash
-python app.py
-```
-
----
-
-### 4. Streamlit 실행
+### 3. Streamlit 실행
 
 ```bash
 streamlit run stream.py
@@ -98,7 +99,7 @@ streamlit run stream.py
 
 ---
 
-### 5. 실행 예시
+### 4. 실행 예시
 
 ```
 PDF 로딩 중...
