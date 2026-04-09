@@ -9,7 +9,7 @@ from modules.vectorstore import build_vectorstore
 from modules.qa import ask_question
 from modules.logger import save_log
 from modules.log_reader import load_logs, get_recent_logs, get_question_counts, get_basic_stats
-
+from modules.faq import load_logs, get_faq_answers
 
 
 load_dotenv()
@@ -149,3 +149,18 @@ if ask_btn:
 
             if not question_counts.empty:
                 st.dataframe(question_counts.head(10), use_container_width=True)
+
+st.divider()
+st.subheader("자동 FAQ")
+
+faq_logs = load_logs()
+faq_df = get_faq_answers(faq_logs, top_n=3)
+
+if faq_df.empty:
+    st.info("FAQ를 생성할 로그가 아직 부족합니다.")
+else:
+    st.caption("저장된 질문 로그를 기준으로 자주 나온 질문을 FAQ 형태로 정리했습니다.")
+
+    for i, row in faq_df.iterrows():
+        with st.expander(f"Q. {row['question']}  (반복 {row['count']}회)"):
+            st.write(f"**A.** {row['answer']}")
