@@ -1,19 +1,17 @@
 import pandas as pd
 from pathlib import Path
-
-LOG_FILE = Path("logs/qa_log.csv")
-
-import pandas as pd
-from pathlib import Path
+from sklearn.metrics.pairwise import cosine_similarity
+from langchain_huggingface import HuggingFaceEmbeddings
 
 
 LOG_FILE = Path("logs/qa_log.csv")
 
 
 def load_logs():
-    
-    #로그 CSV를 읽어 DataFrame으로 반환한다. 파일이 없으면 빈 DataFrame 반환
-    
+    """
+    로그 CSV를 읽어 DataFrame으로 반환한다.
+    파일이 없으면 빈 DataFrame 반환
+    """
     if not LOG_FILE.exists():
         return pd.DataFrame()
 
@@ -23,44 +21,84 @@ def load_logs():
         return pd.DataFrame()
 
 
-def get_top_questions(df, top_n=5):
-    
-    # 자주 나온 질문 Top N 반환
-    
+def group_similar_questions(questions, threshold=0.88):
+    """
+    질문 리스트를 임베딩 기반으로 유사 질문끼리 그룹화한다.
+    """
+    if not questions:
+        return []
+
+    embeddings = HuggingFaceEmbeddings(
+        model_name="sentence-transformers/all-MiniLM-L6-v2"
+    )
+    vectors = embeddings.embed_documents(questions)
+    sim_matrix = cosine_similarity(vectors)
+
+    visited = [False] * len(questions)
+    groups = []
+
+    for i in range(len(questions)):
+        if visited[i]:
+            continue
+
+        current_group = [i]
+        visited[i] = True
+
+        for j in range(i + 1, len(questions)):
+            if not visited[j] and sim_matrix[i][j] >= threshold:
+                current_group.append(j)
+                visited[j] = True
+
+        groups.append(current_group)
+
+    return groups
+
+
+def get_semantic_faq_answers(df, threshold=0.88, top_n=5):
+    """
+    의미가 유사한 질문끼리 그룹화한 뒤,
+    각 그룹의 대표 질문 / 반복 횟수 / 대표 답변 반환
+    """
     if df.empty or "question" not in df.columns:
-        return pd.DataFrame(columns=["question", "count"])
+        return pd.DataFrame(columns=["question", "count", "answer", "grouped_questions"])
 
-    faq_df = (
-        df["question"]
-        .value_counts()
-        .reset_index()
-    )
-    faq_df.columns = ["question", "count"]
+    questions = df["question"].dropna().tolist()
+    if not questions:
+        return pd.DataFrame(columns=["question", "count", "answer", "grouped_questions"])
 
-    return faq_df.head(top_n)
+    groups = group_similar_questions(questions, threshold=threshold)
 
+    faq_rows = []
 
-def get_faq_answers(df, top_n=5):
-    
-    # 자주 나온 질문 Top N에 대해 가장 최근 답변 1개를 매칭해서 반환
+    for group in groups:
+        grouped_questions = [questions[idx] for idx in group]
 
-    if df.empty or "question" not in df.columns or "answer" not in df.columns:
-        return pd.DataFrame(columns=["question", "count", "answer"])
+        # 대표 질문: 가장 짧은 질문을 대표로 사용
+        representative_question = min(grouped_questions, key=len)
 
-    top_questions = get_top_questions(df, top_n=top_n)
+        # 해당 그룹에 속하는 질문들의 로그만 추출
+        group_df = df[df["question"].isin(grouped_questions)].copy()
 
-    if top_questions.empty:
-        return pd.DataFrame(columns=["question", "count", "answer"])
+        # 가장 최근 답변을 대표 답변으로 사용
+        if "timestamp" in group_df.columns:
+            group_df = group_df.sort_values("timestamp", ascending=False)
 
-    if "timestamp" in df.columns:
-        df_sorted = df.sort_values("timestamp", ascending=False)
-    else:
-        df_sorted = df.copy()
+        representative_answer = (
+            group_df.iloc[0]["answer"]
+            if not group_df.empty and "answer" in group_df.columns
+            else "답변 없음"
+        )
 
-    latest_answers = (
-        df_sorted[["question", "answer"]]
-        .drop_duplicates(subset=["question"], keep="first")
-    )
+        faq_rows.append({
+            "question": representative_question,
+            "count": len(grouped_questions),
+            "answer": representative_answer,
+            "grouped_questions": grouped_questions
+        })
 
-    result = top_questions.merge(latest_answers, on="question", how="left")
-    return result
+    faq_df = pd.DataFrame(faq_rows)
+
+    # 유사 질문 개수가 많은 순으로 정렬
+    faq_df = faq_df.sort_values("count", ascending=False).head(top_n)
+
+    return faq_df

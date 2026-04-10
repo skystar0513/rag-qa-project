@@ -9,7 +9,7 @@ from modules.vectorstore import build_vectorstore
 from modules.qa import ask_question
 from modules.logger import save_log
 from modules.log_reader import load_logs, get_recent_logs, get_question_counts, get_basic_stats
-from modules.faq import load_logs, get_faq_answers
+from modules.faq import get_semantic_faq_answers
 
 
 load_dotenv()
@@ -154,13 +154,16 @@ st.divider()
 st.subheader("자동 FAQ")
 
 faq_logs = load_logs()
-faq_df = get_faq_answers(faq_logs, top_n=3)
+faq_df = get_semantic_faq_answers(faq_logs, threshold=0.88, top_n=5)
 
 if faq_df.empty:
     st.info("FAQ를 생성할 로그가 아직 부족합니다.")
 else:
-    st.caption("저장된 질문 로그를 기준으로 자주 나온 질문을 FAQ 형태로 정리했습니다.")
+    st.caption("저장된 질문 로그를 의미 기준으로 그룹화해 FAQ 형태로 정리했습니다.")
 
-    for i, row in faq_df.iterrows():
-        with st.expander(f"Q. {row['question']}  (반복 {row['count']}회)"):
+    for _, row in faq_df.iterrows():
+        with st.expander(f"Q. {row['question']}  (유사 질문 {row['count']}개)"):
             st.write(f"**A.** {row['answer']}")
+            st.write("**같은 의미로 묶인 질문들:**")
+            for q in row["grouped_questions"]:
+                st.write(f"- {q}")

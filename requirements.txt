@@ -3,6 +3,13 @@ langchain
 langchain-community
 langchain-openai
 langchain-text-splitters
+langchain-huggingface
+
 faiss-cpu
 pypdf
 python-dotenv
+
+streamlit
+pandas
+scikit-learn
+sentence-transformers
